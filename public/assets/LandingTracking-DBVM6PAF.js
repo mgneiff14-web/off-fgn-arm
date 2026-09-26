@@ -1,0 +1,1 @@
+import{r as e,t}from"./react-DtVlZneD.js";import{o as n,r,s as i}from"./index-BVRbFM_j.js";var a=e(t(),1),o=()=>((0,a.useEffect)(()=>{i(`/`),r().then(()=>{setTimeout(()=>n(6668),500)})},[]),null);export{o as default};
