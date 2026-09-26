@@ -118,7 +118,7 @@ test('createPix: o pedido enviado segue a documentação (campos, chave e nada a
   assert.equal(req.headers['X-API-Key'], API_KEY);
   assert.deepEqual(req.body, {
     amount: 13135,
-    description: 'Armário Multiuso de Aço — 2 Pretos x2',
+    description: 'Armário Multiuso de Aço - 2 Pretos x2', // o travessão original (—) vira hífen
     reference: 'ord_abc123',
     postback_url: 'https://loja.test/api/shop/webhook?token=t&s=XYZ',
     source: 'api_externa',
@@ -252,6 +252,60 @@ test('webhook sem o contexto na URL (ex.: truncada): usa os dados do próprio av
   const paid = app.calls.utmify.find((c) => c.body.status === 'paid').body;
   assert.equal(paid.trackingParameters.utm_source, 'tiktok', 'UTMs vieram do webhook');
   assert.equal(paid.customer.document, '52998224725');
+});
+
+test('padrão (WEBHOOK_CONTEXT desligado): requisição enxuta como a de uma integração normal', async () => {
+  const app = flevoApp({ env: { WEBHOOK_CONTEXT: '' } });
+  const order = await app.createOrder({ kit: { id: 'armario-multiuso-2-pretos', quantity: 1, shipping: 'standard', coupon: '' } });
+  const sent = app.createdRequest();
+  assert.equal(sent.postback_url, 'https://loja.test/api/shop/webhook', 'URL curta: sem ?s= e sem token');
+  assert.equal(sent.description, 'Armário Multiuso de Aço - 2 Pretos x1', 'travessão trocado por hífen, acentos mantidos');
+  const request = app.fake.requests.find((r) => r.url.endsWith('/api/v1/transaction'));
+  assert.deepEqual(Object.keys(request.headers).sort(), ['Content-Type', 'X-API-Key'], 'sem Accept');
+
+  app.fake.setStatus(order.gatewayId, 'approved');
+  const hook = await app.call('POST', app.webhookPath(), { body: app.fake.webhookBody(order.gatewayId) });
+  assert.equal(hook.status, 200);
+
+  // Purchase com os dados do aviso (sem ttclid/IP, que só viajam com WEBHOOK_CONTEXT=on).
+  const evt = app.calls.tiktok.find((c) => c.body.data[0].event === 'Purchase').body.data[0];
+  assert.equal(evt.user.email, sha('maria@example.com'));
+  assert.equal(evt.user.ttclid, undefined);
+
+  // O createdAt da UTMify é o mesmo na criação e no pagamento, lido da própria referência.
+  const waiting = app.calls.utmify.find((c) => c.body.status === 'waiting_payment').body;
+  const paid = app.calls.utmify.find((c) => c.body.status === 'paid').body;
+  assert.equal(paid.createdAt, waiting.createdAt);
+  assert.equal(paid.orderId, waiting.orderId);
+});
+
+test('o endereço do webhook vem do host da requisição quando PUBLIC_BASE_URL não está definida', async () => {
+  const app = flevoApp({ env: { PUBLIC_BASE_URL: '', WEBHOOK_CONTEXT: '' } });
+  const res = await app.call('POST', '/api/shop/create', {
+    body: validOrder(),
+    headers: { 'x-forwarded-host': 'minha-loja.vercel.app', 'x-forwarded-proto': 'https' },
+  });
+  assert.equal(res.status, 200);
+  assert.equal(app.createdRequest().postback_url, 'https://minha-loja.vercel.app/api/shop/webhook');
+
+  const weird = flevoApp({ env: { PUBLIC_BASE_URL: '', WEBHOOK_CONTEXT: '' } });
+  await weird.call('POST', '/api/shop/create', { body: validOrder(), headers: { 'x-forwarded-host': 'evil.com/../x' } });
+  assert.ok(!('postback_url' in weird.createdRequest()), 'host malformado é ignorado');
+});
+
+test('WEBHOOK_CONTEXT=on: a URL do webhook leva o contexto criptografado', async () => {
+  const app = flevoApp({ env: { WEBHOOK_CONTEXT: 'on' } });
+  await app.createOrder();
+  assert.ok(new URL(app.createdRequest().postback_url).searchParams.get('s'));
+});
+
+test('TIKTOK_EVENT_NAME troca o nome do evento de compra', async () => {
+  const app = flevoApp({ env: { TIKTOK_EVENT_NAME: 'CompletePayment' } });
+  const order = await app.createOrder();
+  app.fake.setStatus(order.gatewayId, 'approved');
+  await app.call('POST', app.webhookPath(), { body: app.fake.webhookBody(order.gatewayId) });
+  assert.ok(app.calls.tiktok.some((c) => c.body.data[0].event === 'CompletePayment'));
+  assert.ok(!app.calls.tiktok.some((c) => c.body.data[0].event === 'Purchase'));
 });
 
 test('webhook falso: "approved" no corpo com o gateway ainda pendente não envia nada', async () => {

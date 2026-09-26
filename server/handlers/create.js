@@ -57,11 +57,24 @@ function parseInput(data) {
   };
 }
 
-function webhookUrl(ctx, sealed) {
-  if (!ctx.config.publicBaseUrl) return '';
-  const url = new URL('/api/shop/webhook', ctx.config.publicBaseUrl);
+// Base do webhook: PUBLIC_BASE_URL, se definida; senão o host da própria requisição (é o endereço
+// que o cliente realmente acessou, sem depender de variável de ambiente); senão o domínio da Vercel.
+function baseUrl(ctx, req) {
+  if (ctx.config.explicitBaseUrl) return ctx.config.explicitBaseUrl;
+  const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
+  if (/^[a-z0-9.-]+(:\d{1,5})?$/i.test(host)) {
+    const proto = String(req.headers['x-forwarded-proto'] || 'https').split(',')[0].trim() === 'http' ? 'http' : 'https';
+    return `${proto}://${host}`;
+  }
+  return ctx.config.publicBaseUrl;
+}
+
+function webhookUrl(ctx, req, sealed) {
+  const base = baseUrl(ctx, req);
+  if (!base) return '';
+  const url = new URL('/api/shop/webhook', base);
   if (ctx.config.webhookToken) url.searchParams.set('token', ctx.config.webhookToken);
-  url.searchParams.set('s', sealed);
+  if (ctx.config.webhookContext) url.searchParams.set('s', sealed);
   return url.toString();
 }
 
@@ -103,7 +116,9 @@ export async function create(ctx, req, { data, ip }) {
       page: (req.headers.referer || '').slice(0, 200),
     },
   };
-  const sealed = seal(secret, context);
+  // O contexto criptografado só é gerado se for usado: na URL do webhook (WEBHOOK_CONTEXT=on) ou
+  // porque o gateway o guarda como metadado (o mock de desenvolvimento).
+  const sealed = ctx.config.webhookContext || ctx.gateway.alwaysSealContext ? seal(secret, context) : '';
 
   let pix;
   try {
@@ -116,7 +131,7 @@ export async function create(ctx, req, { data, ip }) {
       address: input.address,
       attribution: input.attribution,
       description: `${price.product.name} x${price.quantity}`,
-      postbackUrl: webhookUrl(ctx, sealed),
+      postbackUrl: webhookUrl(ctx, req, sealed),
       metadata: sealed,
       expiresInMinutes: ctx.config.pixExpiresMinutes,
     });

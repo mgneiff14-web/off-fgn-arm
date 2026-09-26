@@ -87,7 +87,8 @@ export function createFlevoPay({ apiKey, baseUrl = DEFAULT_BASE_URL } = {}, fetc
   async function request(path, { method = 'GET', body } = {}) {
     const res = await fetchFn(`${baseUrl}${path}`, {
       method,
-      headers: { 'X-API-Key': apiKey, 'Content-Type': 'application/json', Accept: 'application/json' },
+      // Só o essencial, como na integração que já funciona em produção (sem Accept).
+      headers: { 'X-API-Key': apiKey, 'Content-Type': 'application/json' },
       body: body ? JSON.stringify(body) : undefined,
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
@@ -107,7 +108,8 @@ export function createFlevoPay({ apiKey, baseUrl = DEFAULT_BASE_URL } = {}, fetc
         method: 'POST',
         body: {
           amount: amountCents,
-          description,
+          // Travessões viram hífen: caracteres fora do ASCII comum são os que mais dão problema em adquirentes.
+          description: String(description).replace(/[–—]/g, '-'),
           reference,
           ...(postbackUrl ? { postback_url: postbackUrl } : {}),
           source: 'api_externa', // produtos não são cadastrados na plataforma: dispensa productHash

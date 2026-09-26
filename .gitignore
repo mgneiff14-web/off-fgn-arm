@@ -3,3 +3,6 @@ node_modules/
 .env
 .env.*
 !.env.example
+
+# Código de outro projeto, só para consulta local (pode conter chaves). Nunca publicar.
+investigar-metodo-do-projeto-funcional/

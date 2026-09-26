@@ -10,6 +10,7 @@ export function createMockGateway() {
     name: 'mock',
     configured: true,
     statusReturnsPixCode: true,
+    alwaysSealContext: true, // o mock guarda o contexto como metadado (simula gateways que o devolvem)
 
     async createPix({ reference, amountCents, postbackUrl, metadata, expiresInMinutes }) {
       const gatewayId = `mock_${randomUUID()}`;

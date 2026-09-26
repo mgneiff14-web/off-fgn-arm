@@ -4,9 +4,9 @@
 
 const UTMIFY_STATUS = { paid: 'paid', refunded: 'refunded', chargeback: 'chargedback', refused: 'refused' };
 
-export function purchaseEvent(order) {
+export function purchaseEvent(order, eventName = 'Purchase') {
   return {
-    event: 'Purchase',
+    event: eventName,
     eventId: `purchase_${order.id}`,
     time: Math.floor((order.paidAt || Date.now()) / 1000),
     user: {
@@ -37,7 +37,7 @@ export async function runSideEffects(ctx, order) {
   const tasks = [];
   const utmifyStatus = UTMIFY_STATUS[order.status];
   if (utmifyStatus) tasks.push(ctx.utmify.sendOrder(order, utmifyStatus));
-  if (order.status === 'paid') tasks.push(ctx.tiktok.send(purchaseEvent(order)));
+  if (order.status === 'paid') tasks.push(ctx.tiktok.send(purchaseEvent(order, ctx.config.tiktok.purchaseEvent)));
 
   const results = await Promise.all(tasks);
   for (const result of results.filter((r) => !r.ok)) {

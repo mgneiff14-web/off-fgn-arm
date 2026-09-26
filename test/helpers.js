@@ -26,6 +26,8 @@ export function makeApp({ env = {}, failTikTok = false, gatewayFetch } = {}) {
     PAYMENT_GATEWAY: 'mock',
     STATE_SECRET: SECRET,
     PUBLIC_BASE_URL: 'https://loja.test',
+    // Os testes exercitam também o contexto criptografado na URL; o padrão real (desligado) tem testes próprios.
+    WEBHOOK_CONTEXT: 'on',
     TIKTOK_PIXEL_ID: 'PIXEL123',
     TIKTOK_ACCESS_TOKEN: 'tiktok-token',
     UTMIFY_API_TOKEN: 'utmify-token',

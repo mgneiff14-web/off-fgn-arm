@@ -70,15 +70,23 @@ export function loadConfig(env = process.env) {
     production,
     gateway: (env.PAYMENT_GATEWAY || 'flevopay').trim().toLowerCase(),
     pixExpiresMinutes: positive(env.PIX_EXPIRES_MINUTES, 60),
-    // URL pública usada para montar o webhook enviado ao gateway.
-    publicBaseUrl: (env.PUBLIC_BASE_URL || (vercelHost ? `https://${vercelHost}` : '')).replace(/\/$/, ''),
+    // URL pública do webhook: PUBLIC_BASE_URL (se você definir) > host da própria requisição > domínio da Vercel.
+    explicitBaseUrl: (env.PUBLIC_BASE_URL || '').replace(/\/$/, ''),
+    publicBaseUrl: (vercelHost ? `https://${vercelHost}` : '').replace(/\/$/, ''),
     webhookToken: env.WEBHOOK_TOKEN || '',
+    // Padrão: URL de webhook curta, como numa integração normal (o tracking usa os dados do próprio
+    // aviso da FlevoPay). WEBHOOK_CONTEXT=on anexa o contexto criptografado do navegador (ttclid, IP,
+    // user-agent, _ttp) à URL, que passa a ter ~950 caracteres.
+    webhookContext: env.WEBHOOK_CONTEXT === 'on',
     stateSecret,
     stateSecretOk: stateSecret.length >= 32,
     tiktok: {
       pixelId: env.TIKTOK_PIXEL_ID || '',
       accessToken: env.TIKTOK_ACCESS_TOKEN || '',
       testEventCode: env.TIKTOK_TEST_EVENT_CODE || '',
+      // Nome do evento de compra no Events API. O padrão atual da lista oficial é Purchase; se a sua
+      // campanha otimiza por "Complete payment", use TIKTOK_EVENT_NAME=CompletePayment.
+      purchaseEvent: env.TIKTOK_EVENT_NAME || 'Purchase',
     },
     utmify: {
       token: env.UTMIFY_API_TOKEN || '',

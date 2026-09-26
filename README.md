@@ -32,9 +32,11 @@ o distribui em três lugares:
 2. **No `id` do pedido, que o navegador guarda:** um ticket assinado (`id do gateway` + criado em + expira em + total),
    válido só junto com a chave secreta daquele navegador. Ninguém adultera total ou validade, e um id descoberto
    não serve para consultar o pedido de outra pessoa.
-3. **No contexto criptografado (AES-256-GCM) do pedido:** cliente, endereço, UTMs, `ttclid`, `_ttp`, IP e user-agent
-   vão dentro da URL do webhook (`?s=...`) e, se o gateway permitir, também nos metadados da cobrança. Quando o gateway
-   avisa o pagamento, o servidor confirma o status na API dele, abre o contexto e envia `Purchase` ao TikTok e `paid` à UTMify.
+3. **No próprio aviso do gateway:** o webhook da FlevoPay já traz cliente, endereço, UTMs e valor. Quando ele chega, o
+   servidor confirma o status na API dela, monta o pedido com esses dados e envia `Purchase` ao TikTok e `paid` à UTMify.
+   O `createdAt` da UTMify é lido da própria referência do pedido (ela leva a hora de criação), então é o mesmo na criação
+   e no pagamento. Opcional (`WEBHOOK_CONTEXT=on`): o contexto do navegador (`ttclid`, `_ttp`, IP, user-agent) vai
+   criptografado (AES-256-GCM) dentro da URL do webhook; desligado por padrão porque deixa a URL com ~950 caracteres.
 
 O que protege tudo é a variável `STATE_SECRET`.
 
@@ -99,8 +101,12 @@ e aí o gateway não consegue chamar o webhook.
   webhook só consegue fazer o servidor consultar a FlevoPay à toa. Se quiser uma camada extra, defina `WEBHOOK_TOKEN`
   (a URL de cada cobrança passa a levar `?token=`); sem ele nada muda.
 - A consulta de status não documenta devolver o código copia-e-cola, então ele viaja dentro do `id` do pedido.
-- Se a FlevoPay truncar a URL do webhook e o contexto do navegador não chegar, o tracking sai com os dados do próprio aviso
-  (cliente, endereço e UTMs), só sem `ttclid`, IP e user-agent.
+- O tracking do `Purchase` sai com os dados do próprio aviso (cliente, endereço e UTMs), sem `ttclid`, IP e user-agent,
+  a menos que `WEBHOOK_CONTEXT=on`. A tela do PIX já chama `identify` do TikTok com e-mail e telefone do comprador, o que
+  liga o navegador à venda pelo cadastro hasheado.
+- A requisição de criação é enxuta de propósito (só `X-API-Key` e `Content-Type`, `postback_url` curta com o host da própria
+  requisição, descrição sem travessão), no mesmo formato de uma integração da FlevoPay que já roda em produção.
+- Se a FlevoPay criar mais de uma transação por pedido (cada pedido deve gerar uma só), veja `[loja] PIX gerado` nos logs.
 - O endereço de entrega fica na FlevoPay (é enviado na cobrança e devolvido no webhook).
 
 ### Primeiro teste de verdade (faça antes de rodar anúncios)

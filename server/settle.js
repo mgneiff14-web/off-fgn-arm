@@ -18,6 +18,14 @@ export async function cachedRemote(ctx, gatewayId) {
   return fetchRemote(ctx, gatewayId);
 }
 
+// A referência que geramos (ord_<8 caracteres em base 36><12 hex>) leva a hora de criação do pedido.
+// Assim o `createdAt` enviado à UTMify na criação e nas atualizações é o mesmo, sem precisar guardá-lo.
+export function referenceTime(reference) {
+  const m = /^ord_([0-9a-z]{8})/.exec(String(reference || ''));
+  const ms = m ? parseInt(m[1], 36) : NaN;
+  return Number.isFinite(ms) && ms > 1.5e12 && ms < 4e12 ? ms : null;
+}
+
 // Confirma o status no gateway e dispara UTMify/TikTok conforme o status. Usado pelo webhook.
 // O contexto do pedido vem, em ordem de preferência, de: (1) URL do webhook (`sealed`),
 // (2) metadados que o gateway devolve, (3) `snapshot`, os dados que o próprio aviso traz
@@ -28,8 +36,9 @@ export async function settle(ctx, gatewayId, { sealed = '', snapshot = null } = 
 
   let context = open(ctx.config.stateSecret, sealed) || open(ctx.config.stateSecret, remote.metadata);
   if (!context && snapshot) {
-    ctx.log('warn', 'sem contexto do navegador: usando os dados do próprio webhook', { gateway: gatewayId });
-    context = { ...snapshot, createdAt: remote.createdAt || ctx.now() };
+    // Esperado quando WEBHOOK_CONTEXT não está ligado (padrão): não é um erro.
+    ctx.log('info', 'usando os dados do próprio webhook (sem contexto do navegador)', { gateway: gatewayId });
+    context = { ...snapshot, createdAt: referenceTime(gatewayId) || remote.createdAt || ctx.now() };
   }
   if (!context) {
     ctx.log('warn', 'webhook sem contexto do pedido (segredo diferente ou dados não devolvidos)', { gateway: gatewayId });
