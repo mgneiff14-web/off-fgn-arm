@@ -9,7 +9,7 @@ O front chama `/api/shop/*` no próprio domínio, então não há CORS nem URL d
 
 ```
 public/        site publicado (index.html, assets/, img/ e uma pasta por rota do React)
-api/shop/      função única da Vercel: atende todas as rotas /api/shop/*
+api/shop/      uma função da Vercel por rota (catalog, event, create, webhook, health e status/live)
 server/        lógica: preço, gateways de PIX, TikTok, UTMify, criptografia do contexto
 test/          testes automatizados (node --test)
 dev-server.js  servidor local: site + API
@@ -17,6 +17,10 @@ vercel.json    pasta de saída, região (São Paulo), cabeçalhos de segurança 
 ```
 
 `public/` é a única pasta servida como arquivo. O código de `api/` e `server/` nunca fica acessível pelo navegador.
+
+**Rota nova = arquivo novo em `api/shop/`** (dois `import`/`export` de duas linhas, veja `api/shop/create.js`). Não use um
+arquivo catch-all `[...route].js`: na Vercel ele só atendeu rotas de um segmento, e `/api/shop/status/live` virou 404 da
+plataforma. `test/deploy.test.js` falha se alguma rota ficar sem arquivo.
 
 ## Como funciona sem banco
 

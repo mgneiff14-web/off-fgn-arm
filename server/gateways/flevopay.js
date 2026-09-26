@@ -102,6 +102,7 @@ export function createFlevoPay({ apiKey, baseUrl = DEFAULT_BASE_URL } = {}, fetc
 
     async createPix({ reference, amountCents, customer, address, description, postbackUrl, attribution = {} }) {
       const tracking = compact(Object.fromEntries(TRACKING_KEYS.map((k) => [k, attribution[k]])));
+      const startedAt = Date.now();
       const { res, json } = await request('/api/v1/transaction', {
         method: 'POST',
         body: {
@@ -135,6 +136,8 @@ export function createFlevoPay({ apiKey, baseUrl = DEFAULT_BASE_URL } = {}, fetc
         gatewayId: reference,
         pixCode: json.qr_code,
         expiresAt: expires && expires > now && expires < now + 7 * DAY_MS ? expires : undefined,
+        // Só para o log do servidor (sem dados pessoais): mostra se a FlevoPay demorou ou refez tentativas.
+        meta: { ms: now - startedAt, transactionId: json.transaction_id, attempts: json.attempts, acquirer: json.acquirer },
       };
     },
 

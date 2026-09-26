@@ -12,7 +12,7 @@ import { createTikTok } from './integrations/tiktok.js';
 import { createUtmify } from './integrations/utmify.js';
 import { createLimiter, createTtlCache } from './memory.js';
 
-const ROUTES = {
+export const ROUTES = {
   'GET catalog': catalog,
   'GET health': health,
   'POST event': event,
@@ -37,7 +37,7 @@ export function buildContext(env = process.env, overrides = {}) {
     cache: createTtlCache(now),
     now,
     log: (level, message, meta = {}) =>
-      console[level === 'error' ? 'error' : 'warn'](`[loja] ${message} ${JSON.stringify(meta)}`),
+      console[level === 'error' ? 'error' : level === 'info' ? 'log' : 'warn'](`[loja] ${message} ${JSON.stringify(meta)}`),
     ...overrides,
   };
 }

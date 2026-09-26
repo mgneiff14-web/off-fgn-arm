@@ -125,6 +125,7 @@ export async function create(ctx, req, { data, ip }) {
     throw new HttpError(502, 'Não foi possível gerar o Pix. Tente novamente.');
   }
 
+  ctx.log('info', 'PIX gerado', { reference: pix.gatewayId, ...pix.meta });
   const expiresAt = pix.expiresAt || now + ctx.config.pixExpiresMinutes * 60_000;
 
   // Acessório: se a UTMify falhar, o PIX continua válido e pagável.
